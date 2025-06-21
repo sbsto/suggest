@@ -70,8 +70,8 @@ jobs:
         
     - name: Update Homebrew tap
       run: |
-        # Clone the homebrew tap repo
-        gh repo clone sbsto/homebrew-suggest tap-repo
+        # Clone the homebrew tap repo with token authentication
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/sbsto/homebrew-suggest.git tap-repo
         cd tap-repo
         
         # Update the formula
