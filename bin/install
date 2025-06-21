@@ -50,7 +50,7 @@ esac
 
 # Download the binary from GitHub releases
 binary_name="suggest-${platform}-${arch}"
-download_url="https://github.com/sbsto/suggest/releases/download/${version}/${binary_name}"
+download_url="https://github.com/sbsto/suggest/releases/download/v${version}/${binary_name}"
 
 echo "Downloading suggest ${version} for ${platform}/${arch}..."
 curl -fsSL "$download_url" -o "$install_path/bin/suggest"
