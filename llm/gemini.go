@@ -26,7 +26,8 @@ func NewGeminiProvider(apiKey string, ctx context.Context) *GeminiProvider {
 
 func (p *GeminiProvider) GenerateCommand(description string, ctx context.Context) (string, error) {
 	model := p.client.GenerativeModel("gemini-2.5-flash")
-	prompt := fmt.Sprintf(COMMAND_PROMPT, description)
+	osName := getSystemInfo()
+	prompt := fmt.Sprintf(COMMAND_PROMPT, description, osName)
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
@@ -42,7 +43,8 @@ func (p *GeminiProvider) GenerateCommand(description string, ctx context.Context
 
 func (p *GeminiProvider) GenerateCommandWithContext(description, errorContext string, ctx context.Context) (string, error) {
 	model := p.client.GenerativeModel("gemini-2.5-flash")
-	prompt := fmt.Sprintf(COMMAND_WITH_ERROR_PROMPT, description, errorContext)
+	osName := getSystemInfo()
+	prompt := fmt.Sprintf(COMMAND_WITH_ERROR_PROMPT, description, osName, errorContext)
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {

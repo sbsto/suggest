@@ -23,7 +23,8 @@ func NewOpenaiProvider(apiKey string) *OpenaiProvider {
 }
 
 func (p *OpenaiProvider) GenerateCommand(description string, ctx context.Context) (string, error) {
-	prompt := fmt.Sprintf(COMMAND_PROMPT, description)
+	osName := getSystemInfo()
+	prompt := fmt.Sprintf(COMMAND_PROMPT, description, osName)
 
 	chat, err := p.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
@@ -44,7 +45,8 @@ func (p *OpenaiProvider) GenerateCommand(description string, ctx context.Context
 }
 
 func (p *OpenaiProvider) GenerateCommandWithContext(description, errorContext string, ctx context.Context) (string, error) {
-	prompt := fmt.Sprintf(COMMAND_WITH_ERROR_PROMPT, description, errorContext)
+	osName := getSystemInfo()
+	prompt := fmt.Sprintf(COMMAND_WITH_ERROR_PROMPT, description, osName, errorContext)
 
 	chat, err := p.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
