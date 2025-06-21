@@ -70,8 +70,8 @@ jobs:
         
     - name: Update Homebrew tap
       run: |
-        # Clone the homebrew tap repo with token authentication
-        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/sbsto/homebrew-suggest.git tap-repo
+        # Clone the homebrew tap repo
+        git clone https://x-access-token:${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/sbsto/homebrew-suggest.git tap-repo
         cd tap-repo
         
         # Update the formula
@@ -86,7 +86,7 @@ jobs:
         git commit -m "Update formula for suggest v${{ needs.check-version.outputs.new-version }}"
         git push
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         
     - name: Create and push tag
       run: |
