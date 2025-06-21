@@ -71,7 +71,9 @@ func runSuggest(cmd *cobra.Command, args []string) {
 	switch final.selected {
 	case 0:
 		fmt.Printf("%s %s\n", infoStyle.Render("Running:"), commandStyle.Render(suggestion.Command))
-		runCommand(suggestion.Command)
+		if err := runCommand(suggestion.Command); err != nil {
+			handleCommandFailure(suggestion.Command, err, description)
+		}
 	case 1:
 		err := clipboard.WriteAll(suggestion.Command)
 		if err != nil {
@@ -85,11 +87,12 @@ func runSuggest(cmd *cobra.Command, args []string) {
 }
 
 type spinnerModel struct {
-	spinner     spinner.Model
-	description string
-	suggestion  CommandSuggestion
-	err         error
-	done        bool
+	spinner      spinner.Model
+	description  string
+	errorContext string
+	suggestion   CommandSuggestion
+	err          error
+	done         bool
 }
 
 func (m spinnerModel) Init() tea.Cmd {
@@ -101,7 +104,15 @@ func (m spinnerModel) Init() tea.Cmd {
 
 func (m spinnerModel) generateCommand() tea.Msg {
 	ctx := context.Background()
-	response, err := llm.GenerateCommand(m.description, ctx)
+	var response string
+	var err error
+	
+	if m.errorContext != "" {
+		response, err = llm.GenerateCommandWithContext(m.description, m.errorContext, ctx)
+	} else {
+		response, err = llm.GenerateCommand(m.description, ctx)
+	}
+	
 	if err != nil {
 		return suggestionMsg{suggestion: CommandSuggestion{}, err: err}
 	}
@@ -154,13 +165,18 @@ func (m spinnerModel) View() string {
 }
 
 func getSuggestion(description string) (CommandSuggestion, error) {
+	return getSuggestionWithContext(description, "")
+}
+
+func getSuggestionWithContext(description, errorContext string) (CommandSuggestion, error) {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
 
 	m := spinnerModel{
-		spinner:     s,
-		description: description,
+		spinner:      s,
+		description:  description,
+		errorContext: errorContext,
 	}
 
 	p := tea.NewProgram(m)
@@ -248,10 +264,25 @@ func (m menuModel) View() string {
 	return s
 }
 
-func runCommand(command string) {
+type CommandError struct {
+	Command string
+	Err     error
+	Stderr  string
+	Stdout  string
+}
+
+func (ce CommandError) Error() string {
+	result := fmt.Sprintf("Command '%s' failed: %v", ce.Command, ce.Err)
+	if ce.Stderr != "" {
+		result += fmt.Sprintf("\nStderr: %s", ce.Stderr)
+	}
+	return result
+}
+
+func runCommand(command string) error {
 	parts := strings.Fields(command)
 	if len(parts) == 0 {
-		return
+		return nil
 	}
 
 	cmd := exec.Command(parts[0], parts[1:]...)
@@ -288,8 +319,79 @@ func runCommand(command string) {
 		}
 	}
 	
-	// Display error if command failed
+	// Return error with details if command failed
 	if err != nil {
-		fmt.Print(errorStyle.Render(fmt.Sprintf("Command failed: %v", err)))
+		return CommandError{
+			Command: command,
+			Err:     err,
+			Stderr:  strings.TrimSpace(stderr.String()),
+			Stdout:  strings.TrimSpace(stdout.String()),
+		}
+	}
+	
+	return nil
+}
+
+func handleCommandFailure(originalCommand string, cmdErr error, originalDescription string) {
+	fmt.Printf("\n%s\n", errorStyle.Render(fmt.Sprintf("Command failed: %v", cmdErr)))
+
+	menu := menuModel{
+		suggestion: CommandSuggestion{Command: originalCommand, Description: "Failed command"},
+		choices:    []string{"Suggest new command", "Exit"},
+		cursor:     0,
+		selected:   -1,
+	}
+
+	p := tea.NewProgram(menu)
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Println(errorStyle.Render(fmt.Sprintf("Error running menu: %v", err)))
+		return
+	}
+
+	final := finalModel.(menuModel)
+	switch final.selected {
+	case 0:
+		// Suggest new command with error context
+		errorContext := fmt.Sprintf("Previous command '%s' failed with error: %v", originalCommand, cmdErr)
+		newSuggestion, err := getSuggestionWithContext(originalDescription, errorContext)
+		if err != nil {
+			fmt.Println(errorStyle.Render(fmt.Sprintf("Error getting new suggestion: %v", err)))
+			return
+		}
+
+		menu := menuModel{
+			suggestion: newSuggestion,
+			choices:    []string{"Run command", "Copy to clipboard", "Exit"},
+			cursor:     0,
+			selected:   -1,
+		}
+
+		p := tea.NewProgram(menu)
+		finalModel, err := p.Run()
+		if err != nil {
+			fmt.Println(errorStyle.Render(fmt.Sprintf("Error running menu: %v", err)))
+			return
+		}
+
+		final := finalModel.(menuModel)
+		switch final.selected {
+		case 0:
+			fmt.Printf("%s %s\n", infoStyle.Render("Running:"), commandStyle.Render(newSuggestion.Command))
+			if err := runCommand(newSuggestion.Command); err != nil {
+				handleCommandFailure(newSuggestion.Command, err, originalDescription)
+			}
+		case 1:
+			err := clipboard.WriteAll(newSuggestion.Command)
+			if err != nil {
+				fmt.Printf("%s\n", errorStyle.Render(fmt.Sprintf("Error copying to clipboard: %v", err)))
+			} else {
+				fmt.Printf("%s\n", successStyle.Render("Command copied to clipboard!"))
+			}
+		case 2:
+			fmt.Printf("%s\n", infoStyle.Render("Exiting..."))
+		}
+	case 1:
+		fmt.Printf("%s\n", infoStyle.Render("Exiting..."))
 	}
 }
