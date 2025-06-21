@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+        
+    - name: Build binaries
+      run: |
+        # Build for macOS (Intel)
+        GOOS=darwin GOARCH=amd64 go build -o suggest-darwin-amd64 .
+        
+        # Build for macOS (Apple Silicon)
+        GOOS=darwin GOARCH=arm64 go build -o suggest-darwin-arm64 .
+        
+        # Build for Linux
+        GOOS=linux GOARCH=amd64 go build -o suggest-linux-amd64 .
+        
+        # Create universal macOS binary
+        lipo -create -output suggest-darwin-universal suggest-darwin-amd64 suggest-darwin-arm64 || cp suggest-darwin-arm64 suggest-darwin-universal
+        
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          suggest-darwin-universal
+          suggest-darwin-amd64
+          suggest-darwin-arm64
+          suggest-linux-amd64
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
