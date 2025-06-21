@@ -25,8 +25,14 @@ To make these permanent, add the export line to your shell profile file (e.g., `
 
 ## Installation
 
+### Homebrew
 ```bash
 brew install sbsto/suggest/suggest
+```
+
+### Mise
+```bash
+mise use ubi:sbsto/suggest@latest
 ```
 
 ## Usage
