@@ -2,6 +2,8 @@
 
 A CLI tool for suggesting shell commands using AI. Simply describe what you want to do, and `suggest` will provide the appropriate command tailored to your operating system.
 
+https://github.com/user-attachments/assets/e4f17a75-5e25-46e2-a566-d2fb2efd3284
+
 ## Setup
 
 You must have one of the following API keys set in your environment:
