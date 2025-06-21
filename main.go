@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "1.0.7"
+const version = "1.0.8"
 
 type CommandSuggestion struct {
 	Command     string `json:"command"`
@@ -40,11 +40,11 @@ func main() {
 }
 
 var (
-	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B")).Bold(true).Padding(1, 1)
-	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true).Padding(1, 1)
-	infoStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#45B7D1")).Padding(1, 1)
-	commandStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#96CEB4")).Bold(true).Padding(1, 1)
-	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Padding(1, 1)
+	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#E57373")).Bold(true).Padding(1, 1)
+	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#81C784")).Bold(true).Padding(1, 1)
+	infoStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#64B5F6")).Padding(1, 1)
+	commandStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#A5D6A7")).Bold(true).Padding(1, 1)
+	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF9A9A")).Padding(1, 1)
 )
 
 func runSuggest(cmd *cobra.Command, args []string) {
@@ -161,8 +161,8 @@ func (m spinnerModel) View() string {
 	if m.done {
 		return ""
 	}
-	thinkingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#45B7D1"))
-	containerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#45B7D1")).Padding(1, 1)
+	thinkingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#64B5F6"))
+	containerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#64B5F6")).Padding(1, 1)
 	content := fmt.Sprintf("%s %s", m.spinner.View(), thinkingStyle.Render("Thinking..."))
 	return containerStyle.Render(content)
 }
@@ -174,7 +174,7 @@ func getSuggestion(description string) (CommandSuggestion, error) {
 func getSuggestionWithContext(description, errorContext string) (CommandSuggestion, error) {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF9A9A"))
 
 	m := spinnerModel{
 		spinner:      s,
@@ -236,15 +236,15 @@ func (m menuModel) View() string {
 
 	commandHighlightStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#2A2A2A")).
-		Foreground(lipgloss.Color("#96CEB4")).
+		Foreground(lipgloss.Color("#A5D6A7")).
 		Bold(true).
 		Padding(1, 2).
 		Margin(0, 1, 0, 1)
 
 	descriptionStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888888")).
+		Foreground(lipgloss.Color("#9E9E9E")).
 		Italic(true).
-		Padding(0, 1)
+		Padding(1, 1, 0, 1)
 
 	s := "\n" + commandHighlightStyle.Render(m.suggestion.Command)
 	if m.suggestion.Description != "" {
@@ -256,12 +256,12 @@ func (m menuModel) View() string {
 		cursor := "  "
 		if m.cursor == i {
 			cursor = " >"
-			choice = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true).Render(choice)
+			choice = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF9A9A")).Bold(true).Render(choice)
 		}
 		s += fmt.Sprintf("%s %s\n", cursor, choice)
 	}
 
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Padding(0, 1, 1, 1)
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9E9E9E")).Padding(0, 1, 1, 1)
 	s += "\n" + helpStyle.Render("Use ↑/↓ arrows or j/k to navigate, Enter to select, q to quit")
 
 	return s
@@ -313,7 +313,7 @@ func runCommand(command string) error {
 	// Display stderr if there's any
 	if stderr.Len() > 0 {
 		stderrStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF6B6B")).
+			Foreground(lipgloss.Color("#E57373")).
 			Padding(0, 1, 1, 1).
 			Margin(0, 1, 0, 1)
 		stderrOutput := strings.TrimRight(stderr.String(), "\n")
