@@ -68,20 +68,31 @@ jobs:
         SHA256=$(sha256sum suggest-darwin-universal | cut -d' ' -f1)
         echo "sha256=$SHA256" >> $GITHUB_OUTPUT
         
-    - name: Update Homebrew formula
+    - name: Update Homebrew tap
       run: |
+        # Clone the homebrew tap repo
+        gh repo clone sbsto/homebrew-suggest tap-repo
+        cd tap-repo
+        
+        # Update the formula
         sed -i "s/version \".*\"/version \"${{ needs.check-version.outputs.new-version }}\"/" Formula/suggest.rb
         sed -i "s|download/v.*/|download/v${{ needs.check-version.outputs.new-version }}/|" Formula/suggest.rb
         sed -i "s/sha256 \".*\"/sha256 \"${{ steps.sha.outputs.sha256 }}\"/" Formula/suggest.rb
+        
+        # Commit and push changes
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add Formula/suggest.rb
+        git commit -m "Update formula for suggest v${{ needs.check-version.outputs.new-version }}"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Create and push tag
       run: |
         git config user.name github-actions
         git config user.email github-actions@github.com
-        git add Formula/suggest.rb
-        git commit -m "Update Homebrew formula for v${{ needs.check-version.outputs.new-version }}"
         git tag "v${{ needs.check-version.outputs.new-version }}"
-        git push origin main
         git push origin "v${{ needs.check-version.outputs.new-version }}"
         
     - name: Create release
