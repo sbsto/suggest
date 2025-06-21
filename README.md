@@ -6,17 +6,17 @@ A CLI tool for suggesting shell commands using AI. Simply describe what you want
 
 You must have one of the following API keys set in your environment:
 
-### Option 1: OpenAI (checked first)
+### Option 1: OpenAI
 ```bash
 export OPENAI_API_KEY="your-openai-api-key-here"
 ```
 
-### Option 2: Anthropic (checked second)
+### Option 2: Anthropic
 ```bash
 export ANTHROPIC_API_KEY="your-anthropic-api-key-here"
 ```
 
-### Option 3: Google Gemini (checked third)
+### Option 3: Google Gemini
 ```bash
 export GEMINI_API_KEY="your-gemini-api-key-here"
 ```
@@ -36,8 +36,3 @@ go build -o suggest .
 ./suggest "compress all .log files in this directory"
 ./suggest "show me the last 10 commits"
 ```
-
-After getting a suggestion, you can:
-- Press Enter to run the command
-- Press 'y' to copy it to clipboard
-- Press any other key to exit
