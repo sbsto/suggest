@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -47,26 +46,34 @@ func runSuggest(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	fmt.Printf("%s %s\n\n", successStyle.Render("Suggested command:"), commandStyle.Render(suggestion))
-	fmt.Print(infoStyle.Render("Press Enter to run, 'y' to copy to clipboard, or any other key to exit: "))
+	menu := menuModel{
+		suggestion: suggestion,
+		choices:    []string{"Run command", "Copy to clipboard", "Exit"},
+		cursor:     0,
+		selected:   -1,
+	}
 
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
+	p := tea.NewProgram(menu)
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Println(errorStyle.Render(fmt.Sprintf("Error running menu: %v", err)))
+		os.Exit(1)
+	}
 
-	switch input {
-	case "":
-		fmt.Printf("\n%s %s\n", infoStyle.Render("Running:"), commandStyle.Render(suggestion))
+	final := finalModel.(menuModel)
+	switch final.selected {
+	case 0:
+		fmt.Printf("%s %s\n", infoStyle.Render("Running:"), commandStyle.Render(suggestion))
 		runCommand(suggestion)
-	case "y", "Y":
+	case 1:
 		err := clipboard.WriteAll(suggestion)
 		if err != nil {
-			fmt.Printf("\n%s\n", errorStyle.Render(fmt.Sprintf("Error copying to clipboard: %v", err)))
+			fmt.Printf("%s\n", errorStyle.Render(fmt.Sprintf("Error copying to clipboard: %v", err)))
 		} else {
-			fmt.Printf("\n%s\n", successStyle.Render("Command copied to clipboard!"))
+			fmt.Printf("%s\n", successStyle.Render("Command copied to clipboard!"))
 		}
-	default:
-		fmt.Printf("\n%s\n", infoStyle.Render("Exiting..."))
+	case 2:
+		fmt.Printf("%s\n", infoStyle.Render("Exiting..."))
 	}
 }
 
@@ -138,6 +145,72 @@ func getSuggestion(description string) (string, error) {
 
 	final := finalModel.(spinnerModel)
 	return final.suggestion, final.err
+}
+
+type menuModel struct {
+	suggestion string
+	choices    []string
+	cursor     int
+	selected   int
+	done       bool
+}
+
+func (m menuModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			m.selected = 2 // Exit
+			m.done = true
+			return m, tea.Quit
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(m.choices)-1 {
+				m.cursor++
+			}
+		case "enter", " ":
+			m.selected = m.cursor
+			m.done = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m menuModel) View() string {
+	if m.done {
+		return ""
+	}
+
+	commandHighlightStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#2A2A2A")).
+		Foreground(lipgloss.Color("#96CEB4")).
+		Bold(true).
+		Padding(1, 2).
+		Margin(0, 1, 0, 1)
+
+	s := "\n" + commandHighlightStyle.Render(m.suggestion) + "\n\n"
+
+	for i, choice := range m.choices {
+		cursor := "  "
+		if m.cursor == i {
+			cursor = " >"
+			choice = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true).Render(choice)
+		}
+		s += fmt.Sprintf("%s %s\n", cursor, choice)
+	}
+
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Padding(0, 1, 1, 1)
+	s += "\n" + helpStyle.Render("Use ↑/↓ arrows or j/k to navigate, Enter to select, q to quit")
+
+	return s
 }
 
 func runCommand(command string) {
