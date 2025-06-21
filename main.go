@@ -17,6 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const version = "1.0.0"
+
 type CommandSuggestion struct {
 	Command     string `json:"command"`
 	Description string `json:"description"`
@@ -24,10 +26,11 @@ type CommandSuggestion struct {
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "suggest [description]",
-		Short: "Get CLI command suggestions using AI",
-		Args:  cobra.MinimumNArgs(1),
-		Run:   runSuggest,
+		Use:     "suggest [description]",
+		Short:   "Get CLI command suggestions using AI",
+		Version: version,
+		Args:    cobra.MinimumNArgs(1),
+		Run:     runSuggest,
 	}
 
 	if err := rootCmd.Execute(); err != nil {

@@ -2,14 +2,43 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [ main ]
+    paths: [ 'main.go' ]
 
 permissions:
   contents: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.check.outputs.changed }}
+      new-version: ${{ steps.check.outputs.version }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Check if version changed
+      id: check
+      run: |
+        # Get current version from main.go
+        CURRENT_VERSION=$(grep -oP 'const version = "\K[^"]+' main.go)
+        echo "Current version: $CURRENT_VERSION"
+        
+        # Check if this version tag already exists
+        if git rev-parse "v$CURRENT_VERSION" >/dev/null 2>&1; then
+          echo "Version v$CURRENT_VERSION already exists"
+          echo "changed=false" >> $GITHUB_OUTPUT
+        else
+          echo "New version detected: v$CURRENT_VERSION"
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        fi
+
   release:
+    needs: check-version
+    if: needs.check-version.outputs.version-changed == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -32,10 +61,33 @@ jobs:
         
         # Create universal macOS binary
         lipo -create -output suggest-darwin-universal suggest-darwin-amd64 suggest-darwin-arm64 || cp suggest-darwin-arm64 suggest-darwin-universal
+    
+    - name: Calculate SHA256
+      id: sha
+      run: |
+        SHA256=$(sha256sum suggest-darwin-universal | cut -d' ' -f1)
+        echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+        
+    - name: Update Homebrew formula
+      run: |
+        sed -i "s/version \".*\"/version \"${{ needs.check-version.outputs.new-version }}\"/" Formula/suggest.rb
+        sed -i "s|download/v.*/|download/v${{ needs.check-version.outputs.new-version }}/|" Formula/suggest.rb
+        sed -i "s/sha256 \".*\"/sha256 \"${{ steps.sha.outputs.sha256 }}\"/" Formula/suggest.rb
+        
+    - name: Create and push tag
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add Formula/suggest.rb
+        git commit -m "Update Homebrew formula for v${{ needs.check-version.outputs.new-version }}"
+        git tag "v${{ needs.check-version.outputs.new-version }}"
+        git push origin main
+        git push origin "v${{ needs.check-version.outputs.new-version }}"
         
     - name: Create release
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: "v${{ needs.check-version.outputs.new-version }}"
         files: |
           suggest-darwin-universal
           suggest-darwin-amd64
