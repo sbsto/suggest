@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +16,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
+
+type CommandSuggestion struct {
+	Command     string `json:"command"`
+	Description string `json:"description"`
+}
 
 func main() {
 	rootCmd := &cobra.Command{
@@ -63,10 +70,10 @@ func runSuggest(cmd *cobra.Command, args []string) {
 	final := finalModel.(menuModel)
 	switch final.selected {
 	case 0:
-		fmt.Printf("%s %s\n", infoStyle.Render("Running:"), commandStyle.Render(suggestion))
-		runCommand(suggestion)
+		fmt.Printf("%s %s\n", infoStyle.Render("Running:"), commandStyle.Render(suggestion.Command))
+		runCommand(suggestion.Command)
 	case 1:
-		err := clipboard.WriteAll(suggestion)
+		err := clipboard.WriteAll(suggestion.Command)
 		if err != nil {
 			fmt.Printf("%s\n", errorStyle.Render(fmt.Sprintf("Error copying to clipboard: %v", err)))
 		} else {
@@ -80,7 +87,7 @@ func runSuggest(cmd *cobra.Command, args []string) {
 type spinnerModel struct {
 	spinner     spinner.Model
 	description string
-	suggestion  string
+	suggestion  CommandSuggestion
 	err         error
 	done        bool
 }
@@ -94,12 +101,31 @@ func (m spinnerModel) Init() tea.Cmd {
 
 func (m spinnerModel) generateCommand() tea.Msg {
 	ctx := context.Background()
-	suggestion, err := llm.GenerateCommand(m.description, ctx)
-	return suggestionMsg{suggestion: suggestion, err: err}
+	response, err := llm.GenerateCommand(m.description, ctx)
+	if err != nil {
+		return suggestionMsg{suggestion: CommandSuggestion{}, err: err}
+	}
+	
+	// Clean up the response to handle potential markdown or extra text
+	response = strings.TrimSpace(response)
+	if strings.HasPrefix(response, "```json") {
+		response = strings.TrimPrefix(response, "```json")
+		if idx := strings.Index(response, "```"); idx != -1 {
+			response = response[:idx]
+		}
+	}
+	response = strings.TrimSpace(response)
+	
+	var suggestion CommandSuggestion
+	if err := json.Unmarshal([]byte(response), &suggestion); err != nil {
+		// Fallback to treating response as just a command
+		suggestion = CommandSuggestion{Command: response, Description: ""}
+	}
+	return suggestionMsg{suggestion: suggestion, err: nil}
 }
 
 type suggestionMsg struct {
-	suggestion string
+	suggestion CommandSuggestion
 	err        error
 }
 
@@ -127,7 +153,7 @@ func (m spinnerModel) View() string {
 	return containerStyle.Render(content)
 }
 
-func getSuggestion(description string) (string, error) {
+func getSuggestion(description string) (CommandSuggestion, error) {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
@@ -140,7 +166,7 @@ func getSuggestion(description string) (string, error) {
 	p := tea.NewProgram(m)
 	finalModel, err := p.Run()
 	if err != nil {
-		return "", err
+		return CommandSuggestion{}, err
 	}
 
 	final := finalModel.(spinnerModel)
@@ -148,7 +174,7 @@ func getSuggestion(description string) (string, error) {
 }
 
 type menuModel struct {
-	suggestion string
+	suggestion CommandSuggestion
 	choices    []string
 	cursor     int
 	selected   int
@@ -196,7 +222,16 @@ func (m menuModel) View() string {
 		Padding(1, 2).
 		Margin(0, 1, 0, 1)
 
-	s := "\n" + commandHighlightStyle.Render(m.suggestion) + "\n\n"
+	descriptionStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#888888")).
+		Italic(true).
+		Padding(0, 1)
+
+	s := "\n" + commandHighlightStyle.Render(m.suggestion.Command)
+	if m.suggestion.Description != "" {
+		s += "\n" + descriptionStyle.Render(m.suggestion.Description)
+	}
+	s += "\n\n"
 
 	for i, choice := range m.choices {
 		cursor := "  "
@@ -220,11 +255,41 @@ func runCommand(command string) {
 	}
 
 	cmd := exec.Command(parts[0], parts[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	cmd.Stdin = os.Stdin
 
-	if err := cmd.Run(); err != nil {
-		fmt.Println(errorStyle.Render(fmt.Sprintf("Error running command: %v", err)))
+	err := cmd.Run()
+	
+	// Style for command output
+	outputStyle := lipgloss.NewStyle().
+		Padding(0, 1, 1, 1).
+		Margin(0, 1, 0, 1)
+	
+	// Display stdout if there's any
+	if stdout.Len() > 0 {
+		output := strings.TrimRight(stdout.String(), "\n")
+		if output != "" {
+			fmt.Print(outputStyle.Render(output) + "\n")
+		}
+	}
+	
+	// Display stderr if there's any
+	if stderr.Len() > 0 {
+		stderrStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF6B6B")).
+			Padding(0, 1, 1, 1).
+			Margin(0, 1, 0, 1)
+		stderrOutput := strings.TrimRight(stderr.String(), "\n")
+		if stderrOutput != "" {
+			fmt.Print(stderrStyle.Render(stderrOutput) + "\n")
+		}
+	}
+	
+	// Display error if command failed
+	if err != nil {
+		fmt.Print(errorStyle.Render(fmt.Sprintf("Command failed: %v", err)))
 	}
 }
