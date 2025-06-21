@@ -7,9 +7,22 @@ import (
 	"runtime"
 )
 
-const COMMAND_PROMPT = "Given this description: '%s', suggest a single CLI command that would accomplish this task.\n\nSYSTEM CONTEXT:\n- Operating System: %s\n\nYou MUST respond with ONLY valid JSON in this EXACT format:\n{\"command\": \"the raw command\", \"description\": \"brief 1-2 line explanation of what this command does\"}\n\nIMPORTANT REQUIREMENTS:\n- Return ONLY the JSON object, no other text\n- Do not wrap in markdown code blocks\n- Do not include backticks, explanations, or any other formatting\n- The command field must contain the exact command that can be executed\n- The description field must be 1-2 lines maximum\n- Ensure the JSON is properly formatted and valid\n- Consider the operating system when suggesting commands"
+const BASE_PROMPT = `Given this description: '%s', suggest a single CLI command that would accomplish this task.
 
-const COMMAND_WITH_ERROR_PROMPT = "Given this description: '%s', suggest a single CLI command that would accomplish this task.\n\nSYSTEM CONTEXT:\n- Operating System: %s\n\nIMPORTANT CONTEXT: %s\n\nPlease suggest an alternative command that addresses the error or takes a different approach.\n\nYou MUST respond with ONLY valid JSON in this EXACT format:\n{\"command\": \"the raw command\", \"description\": \"brief 1-2 line explanation of what this command does\"}\n\nIMPORTANT REQUIREMENTS:\n- Return ONLY the JSON object, no other text\n- Do not wrap in markdown code blocks\n- Do not include backticks, explanations, or any other formatting\n- The command field must contain the exact command that can be executed\n- The description field must be 1-2 lines maximum\n- Ensure the JSON is properly formatted and valid\n- Consider the error context and suggest a different approach\n- Consider the operating system when suggesting commands"
+SYSTEM CONTEXT:
+- Operating System: %s
+%s
+You MUST respond with ONLY valid JSON in this EXACT format:
+{"command": "the raw command", "description": "brief 1-2 line explanation of what this command does"}
+
+IMPORTANT REQUIREMENTS:
+- Return ONLY the JSON object, no other text
+- Do not wrap in markdown code blocks
+- Do not include backticks, explanations, or any other formatting
+- The command field must contain the exact command that can be executed
+- The description field must be 1-2 lines maximum
+- Ensure the JSON is properly formatted and valid
+- Consider the operating system when suggesting commands%s`
 
 func getProvider(ctx context.Context) LLMProvider {
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
@@ -42,12 +55,14 @@ func getSystemInfo() string {
 
 func buildPrompt(description string) string {
 	osName := getSystemInfo()
-	return fmt.Sprintf(COMMAND_PROMPT, description, osName)
+	return fmt.Sprintf(BASE_PROMPT, description, osName, "", "")
 }
 
 func buildPromptWithContext(description, errorContext string) string {
 	osName := getSystemInfo()
-	return fmt.Sprintf(COMMAND_WITH_ERROR_PROMPT, description, osName, errorContext)
+	errorSection := fmt.Sprintf("\nIMPORTANT CONTEXT: %s\n\nPlease suggest an alternative command that addresses the error or takes a different approach.\n", errorContext)
+	additionalRequirement := "\n- Consider the error context and suggest a different approach"
+	return fmt.Sprintf(BASE_PROMPT, description, osName, errorSection, additionalRequirement)
 }
 
 func GenerateCommand(description string, ctx context.Context) (string, error) {
