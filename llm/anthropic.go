@@ -23,8 +23,7 @@ func NewAnthropicProvider(apiKey string) *AnthropicProvider {
 }
 
 func (p *AnthropicProvider) GenerateCommand(description string, ctx context.Context) (string, error) {
-	osName := getSystemInfo()
-	prompt := fmt.Sprintf(COMMAND_PROMPT, description, osName)
+	prompt := buildPrompt(description)
 
 	message, err := p.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     "claude-3-5-haiku-latest",
@@ -55,8 +54,7 @@ func (p *AnthropicProvider) GenerateCommand(description string, ctx context.Cont
 }
 
 func (p *AnthropicProvider) GenerateCommandWithContext(description, errorContext string, ctx context.Context) (string, error) {
-	osName := getSystemInfo()
-	prompt := fmt.Sprintf(COMMAND_WITH_ERROR_PROMPT, description, osName, errorContext)
+	prompt := buildPromptWithContext(description, errorContext)
 
 	message, err := p.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     "claude-3-5-haiku-latest",

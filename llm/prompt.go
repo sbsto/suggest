@@ -40,6 +40,16 @@ func getSystemInfo() string {
 	return runtime.GOOS
 }
 
+func buildPrompt(description string) string {
+	osName := getSystemInfo()
+	return fmt.Sprintf(COMMAND_PROMPT, description, osName)
+}
+
+func buildPromptWithContext(description, errorContext string) string {
+	osName := getSystemInfo()
+	return fmt.Sprintf(COMMAND_WITH_ERROR_PROMPT, description, osName, errorContext)
+}
+
 func GenerateCommand(description string, ctx context.Context) (string, error) {
 	provider := getProvider(ctx)
 	if provider == nil {
