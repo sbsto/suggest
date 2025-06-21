@@ -26,7 +26,7 @@ To make these permanent, add the export line to your shell profile file (e.g., `
 ## Installation
 
 ```bash
-go build -o suggest .
+brew install sbsto/suggest/suggest
 ```
 
 ## Usage
