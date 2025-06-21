@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "1.0.4"
+const version = "1.0.5"
 
 type CommandSuggestion struct {
 	Command     string `json:"command"`
